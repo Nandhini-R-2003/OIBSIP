@@ -1,0 +1,106 @@
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.metrics import accuracy_score, confusion_matrix, classification_report, roc_curve, auc
+import matplotlib.pyplot as plt
+import seaborn as sns
+from wordcloud import WordCloud
+import zipfile
+
+# Load the dataset from a local ZIP file
+file_path = r"C:\Users\Nandhini\Downloads\sms+spam+collection.zip"
+
+# Extract the dataset
+with zipfile.ZipFile(file_path, 'r') as z:
+    with z.open('SMSSpamCollection') as f:
+        data = pd.read_csv(f, sep='\t', header=None, names=['label', 'text'])
+
+# Display the first few rows and column names for verification
+print("First few rows of the dataset:")
+print(data.head())
+print("\nColumn names in the dataset:")
+print(data.columns)
+
+# Preprocess the dataset
+data['label'] = data['label'].map({'ham': 0, 'spam': 1})  # Map 'ham' to 0 and 'spam' to 1
+
+# Plot the distribution of classes
+plt.figure(figsize=(8, 6))
+sns.countplot(x='label', data=data)
+plt.xlabel('Label')
+plt.ylabel('Count')
+plt.title('Distribution of Spam vs Ham Messages')
+plt.xticks(ticks=[0, 1], labels=['Ham', 'Spam'])
+plt.show()
+
+# Generate word clouds for spam and ham messages
+spam_text = ' '.join(data[data['label'] == 1]['text'])
+ham_text = ' '.join(data[data['label'] == 0]['text'])
+
+# Word cloud for spam messages
+plt.figure(figsize=(12, 6))
+wordcloud_spam = WordCloud(width=800, height=400, background_color='white').generate(spam_text)
+plt.imshow(wordcloud_spam, interpolation='bilinear')
+plt.axis('off')
+plt.title('Word Cloud for Spam Messages')
+plt.show()
+
+# Word cloud for ham messages
+plt.figure(figsize=(12, 6))
+wordcloud_ham = WordCloud(width=800, height=400, background_color='white').generate(ham_text)
+plt.imshow(wordcloud_ham, interpolation='bilinear')
+plt.axis('off')
+plt.title('Word Cloud for Ham Messages')
+plt.show()
+
+# Features and target variable
+X = data['text']
+y = data['label']
+
+# Convert text data into numerical data
+vectorizer = CountVectorizer()
+X_vectorized = vectorizer.fit_transform(X)
+
+# Split the data into training and testing sets
+X_train, X_test, y_train, y_test = train_test_split(X_vectorized, y, test_size=0.2, random_state=42)
+
+# Train a Naive Bayes classifier
+model = MultinomialNB()
+model.fit(X_train, y_train)
+
+# Make predictions
+y_pred = model.predict(X_test)
+y_proba = model.predict_proba(X_test)[:, 1]  # Probability estimates for ROC curve
+
+# Evaluate the model
+accuracy = accuracy_score(y_test, y_pred)
+conf_matrix = confusion_matrix(y_test, y_pred)
+class_report = classification_report(y_test, y_pred, target_names=['Not Spam', 'Spam'])
+
+print(f'\nAccuracy: {accuracy}')
+print(f'\nConfusion Matrix:\n{conf_matrix}')
+print(f'\nClassification Report:\n{class_report}')
+
+# Plotting Confusion Matrix
+plt.figure(figsize=(8, 6))
+sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues', xticklabels=['Not Spam', 'Spam'], yticklabels=['Not Spam', 'Spam'])
+plt.xlabel('Predicted')
+plt.ylabel('True')
+plt.title('Confusion Matrix')
+plt.show()
+
+# Plot ROC Curve
+fpr, tpr, _ = roc_curve(y_test, y_proba)
+roc_auc = auc(fpr, tpr)
+
+plt.figure(figsize=(8, 6))
+plt.plot(fpr, tpr, color='blue', lw=2, label=f'ROC curve (area = {roc_auc:.2f})')
+plt.plot([0, 1], [0, 1], color='gray', linestyle='--')
+plt.xlim([0.0, 1.0])
+plt.ylim([0.0, 1.05])
+plt.xlabel('False Positive Rate')
+plt.ylabel('True Positive Rate')
+plt.title('Receiver Operating Characteristic (ROC) Curve')
+plt.legend(loc='lower right')
+plt.show()
